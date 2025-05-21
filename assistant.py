@@ -20,20 +20,21 @@ class SmartAssistant:
         self.stt_model = WhisperModel(
             config.STT_MODEL, device="cuda" if torch.cuda.is_available() else "cpu")
 
-        # Initialize Language Model (Mistral)
+        # Initialize Language Model (SmolLM)
         print("Loading LLM model...")
         self.tokenizer = AutoTokenizer.from_pretrained(config.LLM_MODEL)
-        self.llm = pipeline(
-            "text-generation",
-            model=config.LLM_MODEL,
+        
+        # Load model with efficient settings
+        print("Loading model with efficient settings...")
+        self.model = AutoModelForCausalLM.from_pretrained(
+            config.LLM_MODEL,
             torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-            device_map="auto"
+            device_map="auto" if torch.cuda.is_available() else None
         )
 
         # Initialize Text-to-Speech
-        print("Loading TTS engine...")
+        print("Initializing TTS...")
         self.tts_engine = pyttsx3.init()
-        # Configure TTS properties
         self.tts_engine.setProperty('rate', config.TTS_RATE)
         self.tts_engine.setProperty('volume', config.TTS_VOLUME)
 
@@ -57,71 +58,62 @@ class SmartAssistant:
 
     def transcribe(self, audio_file):
         """Convert speech to text using Whisper"""
-        if audio_file is None:
-            return ""
-
         segments, _ = self.stt_model.transcribe(audio_file)
-        text = " ".join([segment.text for segment in segments])
-        os.unlink(audio_file)  # Clean up temporary file
-
-        print(f"You said: {text}")
-        return text
+        return " ".join([segment.text for segment in segments])
 
     def generate_response(self, query):
-        """Generate response using LLM"""
-        if not query.strip():
-            return "I didn't catch that. Could you please repeat?"
-
-        # Add to conversation history
-        self.conversation_history.append(f"User: {query}")
-
-        # Format prompt with conversation history
-        # Keep last 5 exchanges for context
-        prompt = "\n".join(self.conversation_history[-5:])
-        prompt += f"\nAssistant:"
-
-        # Generate response
-        response = self.llm(
-            prompt,
+        """Generate response using SmolLM"""
+        messages = [{"role": "user", "content": query}]
+        input_text = self.tokenizer.apply_chat_template(messages, tokenize=False)
+        inputs = self.tokenizer(input_text, return_tensors="pt")
+        
+        # Move inputs to GPU if available
+        if torch.cuda.is_available():
+            inputs = {k: v.cuda() for k, v in inputs.items()}
+            
+        outputs = self.model.generate(
+            **inputs,
             max_new_tokens=config.MAX_NEW_TOKENS,
-            do_sample=True,
             temperature=config.TEMPERATURE,
             top_p=config.TOP_P,
-        )[0]["generated_text"]
-
+            do_sample=True
+        )
+        response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+        
         # Extract just the assistant's response
-        assistant_response = response.split("Assistant:")[-1].strip()
-
-        # Add to conversation history
-        self.conversation_history.append(f"Assistant: {assistant_response}")
-
-        print(f"Assistant: {assistant_response}")
-        return assistant_response
+        response = response.split("Assistant: ")[-1].strip()
+        return response
 
     def speak(self, text):
-        """Convert text to speech and play it"""
+        """Convert text to speech using pyttsx3"""
         self.tts_engine.say(text)
         self.tts_engine.runAndWait()
 
     def run(self):
         """Main loop for the assistant"""
-        print("Smart Assistant is running. Say 'exit' or 'quit' to stop.")
+        print("\nSmart Assistant is running. Say 'exit' or 'quit' to stop.")
+        print("-" * 50)
 
         while True:
             # Listen for command
+            print("\nListening...")
             audio_file = self.listen()
 
             # Transcribe audio to text
             query = self.transcribe(audio_file)
+            print("\nYou said:", query)
 
             # Check for exit command
             if query.lower() in ["exit", "quit", "stop", "bye"]:
-                print("Exiting Smart Assistant. Goodbye!")
+                print("\nExiting Smart Assistant. Goodbye!")
                 self.speak("Goodbye!")
                 break
 
             # Generate response
+            print("\nThinking...")
             response = self.generate_response(query)
+            print("\nAssistant:", response)
+            print("-" * 50)
 
             # Speak response
             self.speak(response)
