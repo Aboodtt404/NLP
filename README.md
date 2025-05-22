@@ -1,28 +1,46 @@
-# Smart Assistant
+# Voice Assistant with Transformer-based NLP
 
-A voice-powered smart assistant that can understand and respond to voice commands using speech-to-text, language models, and text-to-speech technologies.
+This project implements a voice assistant using transformer-based natural language processing. It can understand voice commands, process them using state-of-the-art NLP techniques, and provide appropriate responses.
 
-## Features (Week 1)
-
-- Speech-to-Text using Whisper
-- Language understanding with Mistral 7B
-- Text-to-Speech with Coqui TTS
+## Features
+- Speech-to-text conversion
+- Intent classification using transformers
+- Text-to-speech response generation
+- Performance evaluation metrics
 
 ## Setup
+1. Install the required dependencies:
+```bash
+pip install -r requirements.txt
+```
 
-1. Install dependencies:
-   ```
-   pip install -r requirements.txt
-   ```
+2. Install PyAudio system dependencies (if needed):
+- Windows: No additional steps needed
+- Linux: `sudo apt-get install portaudio19-dev`
+- macOS: `brew install portaudio`
 
-2. Download required models (first run will automatically download them)
+## Project Structure
+- `src/` - Source code directory
+  - `voice_recognition.py` - Speech recognition module
+  - `model.py` - Transformer model implementation
+  - `train.py` - Training script
+  - `evaluate.py` - Evaluation metrics
+  - `utils.py` - Utility functions
+- `data/` - Dataset directory
+- `models/` - Saved model checkpoints
+- `notebooks/` - Jupyter notebooks for analysis
 
-3. Run the assistant:
-   ```
-   python assistant.py
-   ```
+## Dataset
+The project uses the [CLINC150](https://github.com/clinc/oos-eval) dataset for intent classification, which contains 150 intent classes across 10 domains, making it suitable for voice assistant applications.
 
-## Usage
+## Model Architecture
+The project implements a transformer-based architecture for intent classification with the following components:
+- Pre-trained BERT model for text embeddings
+- Custom classification head
+- Fine-tuning on domain-specific data
 
-- Speak to the assistant after the "Listening..." prompt
-- Say "exit" or "quit" to end the session 
+## Evaluation Metrics
+- Accuracy
+- Confusion Matrix
+- Precision, Recall, and F1 Score
+- Intent Classification Report 
